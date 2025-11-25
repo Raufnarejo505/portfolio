@@ -1,0 +1,341 @@
+---
+title: "Beyond Accuracy: Comprehensive Model Evaluation and Production Monitoring"
+date: "2024-11-25"
+excerpt: "A deep dive into model evaluation metrics, monitoring strategies, and production ML observability. Learn how to detect model degradation and maintain performance in production."
+tags: ["mlops", "model-evaluation", "monitoring", "production", "observability"]
+readingTime: "13 min"
+---
+
+Building a great model is only half the battle. The other half is ensuring it continues to perform well in production. In this article, I'll cover comprehensive evaluation strategies and monitoring techniques that keep your ML systems reliable and performant.
+
+## The Evaluation Challenge
+
+Model evaluation isn't just about accuracy. Different problems require different metrics, and production monitoring needs to catch issues before they impact users.
+
+## Classification Metrics: Beyond Accuracy
+
+### Precision, Recall, and F1-Score
+
+```python
+from sklearn.metrics import precision_score, recall_score, f1_score, classification_report
+
+# Binary classification
+precision = precision_score(y_true, y_pred)
+recall = recall_score(y_true, y_pred)
+f1 = f1_score(y_true, y_pred)
+
+# Multi-class
+precision_macro = precision_score(y_true, y_pred, average='macro')
+recall_macro = recall_score(y_true, y_pred, average='macro')
+f1_macro = f1_score(y_true, y_pred, average='macro')
+
+# Per-class metrics
+print(classification_report(y_true, y_pred))
+```
+
+### ROC-AUC and PR-AUC
+
+```python
+from sklearn.metrics import roc_auc_score, average_precision_score, roc_curve, precision_recall_curve
+
+# ROC-AUC (good for balanced datasets)
+roc_auc = roc_auc_score(y_true, y_proba)
+
+# PR-AUC (better for imbalanced datasets)
+pr_auc = average_precision_score(y_true, y_proba)
+
+# Plot curves
+fpr, tpr, _ = roc_curve(y_true, y_proba)
+precision_curve, recall_curve, _ = precision_recall_curve(y_true, y_proba)
+```
+
+### Confusion Matrix Analysis
+
+```python
+from sklearn.metrics import confusion_matrix
+import seaborn as sns
+
+cm = confusion_matrix(y_true, y_pred)
+sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
+
+# Calculate per-class metrics
+tn, fp, fn, tp = cm.ravel()
+specificity = tn / (tn + fp)  # True negative rate
+sensitivity = tp / (tp + fn)  # True positive rate (recall)
+```
+
+## Regression Metrics
+
+### Multiple Metrics for Different Perspectives
+
+```python
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score, mean_absolute_percentage_error
+
+mse = mean_squared_error(y_true, y_pred)
+rmse = np.sqrt(mse)
+mae = mean_absolute_error(y_true, y_pred)
+mape = mean_absolute_percentage_error(y_true, y_pred)
+r2 = r2_score(y_true, y_pred)
+
+# Percentile-based metrics (robust to outliers)
+def percentile_absolute_error(y_true, y_pred, percentile=50):
+    errors = np.abs(y_true - y_pred)
+    return np.percentile(errors, percentile)
+```
+
+## Cross-Validation Strategies
+
+### Time Series Cross-Validation
+
+For time-dependent data, use time-based splits:
+
+```python
+from sklearn.model_selection import TimeSeriesSplit
+
+tscv = TimeSeriesSplit(n_splits=5)
+for train_idx, val_idx in tscv.split(X):
+    X_train, X_val = X.iloc[train_idx], X.iloc[val_idx]
+    y_train, y_val = y.iloc[train_idx], y.iloc[val_idx]
+    
+    model.fit(X_train, y_train)
+    score = model.score(X_val, y_val)
+    scores.append(score)
+```
+
+### Stratified K-Fold
+
+For imbalanced datasets:
+
+```python
+from sklearn.model_selection import StratifiedKFold
+
+skf = StratifiedKFold(n_splits=5, shuffle=True)
+for train_idx, val_idx in skf.split(X, y):
+    # Train and evaluate
+```
+
+## Production Monitoring: The Three Pillars
+
+### 1. Data Drift Detection
+
+Monitor input feature distributions:
+
+```python
+from scipy import stats
+
+def detect_drift(reference_data, current_data, threshold=0.05):
+    """Detect distribution drift using Kolmogorov-Smirnov test"""
+    drift_detected = {}
+    
+    for col in reference_data.columns:
+        if reference_data[col].dtype in ['float64', 'int64']:
+            statistic, p_value = stats.ks_2samp(
+                reference_data[col],
+                current_data[col]
+            )
+            drift_detected[col] = {
+                'p_value': p_value,
+                'drifted': p_value < threshold
+            }
+    
+    return drift_detected
+```
+
+### 2. Prediction Drift
+
+Monitor model output distributions:
+
+```python
+def monitor_predictions(reference_preds, current_preds):
+    """Monitor prediction distribution changes"""
+    reference_mean = np.mean(reference_preds)
+    current_mean = np.mean(current_preds)
+    
+    reference_std = np.std(reference_preds)
+    current_std = np.std(current_preds)
+    
+    # Z-score test for mean shift
+    z_score = (current_mean - reference_mean) / reference_std
+    mean_shifted = abs(z_score) > 2  # 2 standard deviations
+    
+    return {
+        'mean_shift': current_mean - reference_mean,
+        'std_change': current_std - reference_std,
+        'mean_shifted': mean_shifted,
+        'z_score': z_score
+    }
+```
+
+### 3. Performance Monitoring
+
+Track model performance over time:
+
+```python
+def monitor_performance(y_true, y_pred, y_proba=None):
+    """Monitor key performance metrics"""
+    metrics = {
+        'accuracy': accuracy_score(y_true, y_pred),
+        'precision': precision_score(y_true, y_pred, average='weighted'),
+        'recall': recall_score(y_true, y_pred, average='weighted'),
+        'f1_score': f1_score(y_true, y_pred, average='weighted')
+    }
+    
+    if y_proba is not None:
+        metrics['roc_auc'] = roc_auc_score(y_true, y_proba)
+    
+    return metrics
+```
+
+## Automated Alerting
+
+Set up alerts for model degradation:
+
+```python
+def check_model_health(current_metrics, baseline_metrics, thresholds):
+    """Check if model performance has degraded"""
+    alerts = []
+    
+    for metric in current_metrics:
+        if metric in baseline_metrics:
+            degradation = baseline_metrics[metric] - current_metrics[metric]
+            threshold = thresholds.get(metric, 0.05)
+            
+            if degradation > threshold:
+                alerts.append({
+                    'metric': metric,
+                    'baseline': baseline_metrics[metric],
+                    'current': current_metrics[metric],
+                    'degradation': degradation
+                })
+    
+    return alerts
+```
+
+## Model Versioning and A/B Testing
+
+### Version Comparison
+
+```python
+def compare_models(model_a_preds, model_b_preds, y_true):
+    """Compare two model versions"""
+    metrics_a = calculate_metrics(y_true, model_a_preds)
+    metrics_b = calculate_metrics(y_true, model_b_preds)
+    
+    comparison = {}
+    for metric in metrics_a:
+        improvement = metrics_b[metric] - metrics_a[metric]
+        comparison[metric] = {
+            'model_a': metrics_a[metric],
+            'model_b': metrics_b[metric],
+            'improvement': improvement,
+            'improvement_pct': (improvement / metrics_a[metric]) * 100
+        }
+    
+    return comparison
+```
+
+### Statistical Significance Testing
+
+```python
+from scipy import stats
+
+def test_significance(model_a_scores, model_b_scores):
+    """Test if improvement is statistically significant"""
+    statistic, p_value = stats.ttest_rel(model_a_scores, model_b_scores)
+    significant = p_value < 0.05
+    
+    return {
+        'p_value': p_value,
+        'significant': significant,
+        'mean_improvement': np.mean(model_b_scores) - np.mean(model_a_scores)
+    }
+```
+
+## Monitoring Dashboard
+
+Create a comprehensive monitoring dashboard:
+
+```python
+def create_monitoring_dashboard(metrics_history, drift_history, performance_history):
+    """Create monitoring dashboard data"""
+    dashboard = {
+        'metrics_trend': {
+            'dates': [m['date'] for m in metrics_history],
+            'accuracy': [m['accuracy'] for m in metrics_history],
+            'precision': [m['precision'] for m in metrics_history],
+            'recall': [m['recall'] for m in metrics_history]
+        },
+        'drift_summary': {
+            'features_drifted': sum(1 for d in drift_history if d['drifted']),
+            'total_features': len(drift_history),
+            'drift_rate': sum(1 for d in drift_history if d['drifted']) / len(drift_history)
+        },
+        'performance_alerts': [
+            alert for alert in performance_history 
+            if alert.get('alert_triggered', False)
+        ]
+    }
+    
+    return dashboard
+```
+
+## Best Practices
+
+### 1. Establish Baselines
+
+Set clear performance baselines before deployment:
+- **Minimum acceptable performance**: Below this, trigger alerts
+- **Expected performance**: Target range
+- **Best observed performance**: Upper bound
+
+### 2. Monitor Continuously
+
+- **Real-time monitoring**: Track predictions as they happen
+- **Batch monitoring**: Daily/weekly aggregate analysis
+- **Scheduled evaluations**: Regular retraining assessments
+
+### 3. Set Up Alerts
+
+Configure alerts for:
+- Performance degradation (>5% drop)
+- Data drift (distribution changes)
+- Prediction drift (output distribution shifts)
+- System errors (API failures, timeouts)
+
+### 4. Maintain Evaluation Datasets
+
+Keep separate evaluation sets:
+- **Validation set**: For model selection
+- **Test set**: For final evaluation
+- **Production sample**: For ongoing monitoring
+
+### 5. Document Everything
+
+Document:
+- Evaluation methodology
+- Baseline metrics
+- Monitoring thresholds
+- Alert procedures
+- Response protocols
+
+## Tools and Platforms
+
+Popular tools for ML monitoring:
+- **MLflow**: Experiment tracking and model registry
+- **Weights & Biases**: Experiment tracking and visualization
+- **Evidently AI**: Data and model drift detection
+- **Arize AI**: Production ML observability
+- **Fiddler**: Model monitoring and explainability
+
+## Key Takeaways
+
+1. **Metrics matter**: Choose metrics aligned with business objectives
+2. **Monitor continuously**: Catch issues before they impact users
+3. **Detect drift early**: Data and prediction drift signal problems
+4. **Automate alerts**: Don't rely on manual checks
+5. **Document baselines**: Know what "good" looks like
+
+Model evaluation and monitoring are ongoing processes, not one-time tasks. The best models are those that are continuously monitored, evaluated, and improved based on production performance.
+
+Have questions about monitoring your ML systems? I'm happy to discuss specific challenges or share more implementation details.
+

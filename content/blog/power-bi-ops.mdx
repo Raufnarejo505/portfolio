@@ -1,0 +1,24 @@
+---
+title: "Power BI + Python Automation for Insight Ops"
+date: "2025-01-15"
+excerpt: "Automate refreshes, narratives, and alerting around Power BI using Python scripts and serverless hooks."
+tags: ["powerbi", "automation", "analytics"]
+readingTime: "5 min"
+---
+
+Power BI is still the fastest path to executive-ready dashboards, but it becomes unstoppable once you wire it into Python automation.
+
+## Automate refresh governance
+
+Schedule refresh APIs with Azure Functions or AWS Lambda. Pair with a lightweight Python watchdog that validates row counts and pushes failures right to Teams or Slack.
+
+## Generate narratives
+
+Use Python templating (I like Jinja) to turn query outputs into stories: *"MRR grew 12% WoW driven by enterprise upgrades."* Drop the message into Teams and paste a link to the refreshed dashboard.
+
+## Close the loop with SQL
+
+Codify your SQL in dbt or a version-controlled repo. Trigger the transformations before the Power BI refresh so everything stays consistent.
+
+This automation stack is part of my standard deliverables for reporting clients. Ping me if you need it.
+
