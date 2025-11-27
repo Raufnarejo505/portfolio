@@ -85,7 +85,7 @@ export function HeroSection() {
             <div className="rounded-[28px] border border-border/80 bg-gradient-to-br from-background to-muted/20 p-8 text-center backdrop-blur">
               <div className="relative mx-auto mb-6 h-32 w-32 overflow-hidden rounded-3xl border border-border/80">
                 <Image
-                  src="https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=350&q=80"
+                  src="/profile.png"
                   alt="Abdul Rauf"
                   fill
                   className="object-cover"
